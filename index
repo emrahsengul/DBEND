@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRP Spool Profesyonel Çizim Aracı</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #e0e5ec;
+            --panel-bg: #2b2d42;
+            --panel-text: #edf2f4;
+            --accent: #ef233c;
+            --accent-hover: #d90429;
+            --paper-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- SOL PANEL (Kontroller) --- */
+        .sidebar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            color: var(--panel-text);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+            color: #8d99ae;
+            font-weight: 600;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 10px;
+            background: #3e4157;
+            border: 1px solid #4a4e69;
+            color: white;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+            transition: 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .row { display: flex; gap: 10px; }
+        .col { flex: 1; }
+
+        button.btn-draw {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-top: 10px;
+            width: 100%;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        button.btn-draw:hover { background-color: var(--accent-hover); }
+
+        button.btn-print {
+            background-color: #4a4e69;
+            margin-top: 10px;
+        }
+        button.btn-print:hover { background-color: #5c6185; }
+
+        /* Teknik Rapor Tablosu (Sol Panelde) */
+        .tech-report {
+            margin-top: 20px;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        .tech-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .tech-row span:last-child { font-weight: bold; color: var(--accent); }
+
+        /* --- SAĞ PANEL (Çizim Alanı) --- */
+        .workspace {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-image: 
+                radial-gradient(#bdc3c7 1px, transparent 1px),
+                radial-gradient(#bdc3c7 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+
+        #paper {
+            background: white;
+            width: 90%; /* Responsive genişlik */
+            height: 90%;
+            max-width: 1123px; /* A4 Yatay pixel (yaklaşık 96dpi) */
+            max-height: 794px;
+            box-shadow: var(--paper-shadow);
+            position: relative;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* --- YAZDIRMA (Print) AYARLARI --- */
+        @media print {
+            @page { size: A4 landscape; margin: 0; }
+            body { background: white; height: 100%; overflow: visible; display: block; }
+            .sidebar { display: none !important; }
+            .workspace { background: none; display: block; height: 100%; padding: 0; margin: 0; }
+            #paper { 
+                box-shadow: none; 
+                width: 100%; 
+                height: 100%; 
+                max-width: none; 
+                max-height: none;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2><i class="fas fa-drafting-compass"></i> GRP Tasarım</h2>
+    
+    <div class="input-group">
+        <label>DN (Anma Çapı - mm)</label>
+        <input type="number" id="dn" value="600" onchange="updateSegments()">
+    </div>
+
+    <div class="input-group">
+        <label>Dirsek Açısı (°)</label>
+        <input type="number" id="angle" value="90" min="1" max="179" oninput="updateSegments()">
+    </div>
+
+    <div class="input-group">
+        <label>Segment Sayısı (Otomatik)</label>
+        <input type="number" id="segments" value="4" readonly style="background: #2b2d42; border-color: transparent; font-weight: bold; color: var(--accent);">
+    </div>
+
+    <div class="row">
+        <div class="col input-group">
+            <label>L1 Giriş (mm)</label>
+            <input type="number" id="l1" value="2000">
+        </div>
+        <div class="col input-group">
+            <label>Tip</label>
+            <select id="typeIn">
+                <option value="flange">Flanş</option>
+                <option value="coupling">Manşon</option>
+                <option value="plain">Düz</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col input-group">
+            <label>L2 Çıkış (mm)</label>
+            <input type="number" id="l2" value="2000">
+        </div>
+        <div class="col input-group">
+            <label>Tip</label>
+            <select id="typeOut">
+                <option value="flange">Flanş</option>
+                <option value="coupling">Manşon</option>
+                <option value="plain">Düz</option>
+            </select>
+        </div>
+    </div>
+
+    <button class="btn-draw" onclick="draw()"><i class="fas fa-sync-alt"></i> Güncelle</button>
+    <button class="btn-draw btn-print" onclick="window.print()"><i class="fas fa-file-pdf"></i> PDF İndir</button>
+
+    <div class="tech-report" id="report">
+        </div>
+</div>
+
+<div class="workspace">
+    <div id="paper">
+        <svg id="svgCanvas" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+</div>
+
+<script>
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    // --- YARDIMCI FONKSİYONLAR ---
+    function createSVG(tag, attrs) {
+        const el = document.createElementNS(SVG_NS, tag);
+        for (let k in attrs) el.setAttribute(k, attrs[k]);
+        return el;
+    }
+    function toRad(deg) { return deg * Math.PI / 180; }
+    function toDeg(rad) { return rad * 180 / Math.PI; }
+
+    // Segment Kuralı
+    function updateSegments() {
+        const angle = parseFloat(document.getElementById('angle').value) || 90;
+        let seg = 4;
+        if (angle <= 31) seg = 2;
+        else if (angle <= 61) seg = 3;
+        else seg = 4;
+        document.getElementById('segments').value = seg;
+        // Opsiyonel: Anlık çizim güncellemesi için draw() çağrılabilir
+    }
+
+    // --- ANA ÇİZİM FONKSİYONU ---
+    function draw() {
+        updateSegments(); // Emin olmak için tekrar hesapla
+        
+        const svg = document.getElementById('svgCanvas');
+        svg.innerHTML = ''; // Temizle
+
+        // Girdileri Al
+        const DN = parseFloat(document.getElementById('dn').value) || 600;
+        const AngleDeg = parseFloat(document.getElementById('angle').value) || 90;
+        const Segments = parseInt(document.getElementById('segments').value);
+        const L1 = parseFloat(document.getElementById('l1').value) || 0;
+        const L2 = parseFloat(document.getElementById('l2').value) || 0;
+        const TypeIn = document.getElementById('typeIn').value;
+        const TypeOut = document.getElementById('typeOut').value;
+        const RFactor = 1.5;
+        const R = DN * RFactor;
+
+        // --- GEOMETRİ HESAPLAMA (Vektörel) ---
+        // Strateji: 
+        // 1. Başlangıç Noktası (0,0) -> Giriş Borusunun Başı.
+        // 2. Giriş Borusu Vektörü -> (1, 0) yani Sağa doğru.
+        // 3. Dirsek Başlangıcı -> (L1, 0).
+        // 4. Dirsek Merkezi (Eğrilik) -> (L1, R). (Çünkü giriş yatay, dönüş yukarı doğru olsun).
+        //    Düzeltme: Eğer giriş yatay (0 derece) ise ve dönüş yukarı (pozitif açı değil, SVG'de -Y) olacaksa:
+        //    Merkez: (L1, -R) olur. Dönüş açısı: 270 (veya -90) dereceden başlar.
+        
+        // Daha Basit Model:
+        // Dirsek Merkezi (0,0) olsun.
+        // Giriş Noktası (-R, 0) değil, açıyı kontrol edelim.
+        // Giriş Akışı: Soldan Sağa.
+        // Dirsek Başlangıç Açısı: 270 (-90) derece (Saat 6 yönü) -> Giriş Vektörü (1,0).
+        // Hayır, en kolayı:
+        // Merkez (0,0). Giriş Noktası (0, R). Akış Yönü (1, 0) olması için teğetin yatay olması lazım.
+        // Teğetin yatay olduğu yer çemberin tepesi (90 derece) veya altı (270 derece).
+        
+        // KABUL EDİLEN MODEL:
+        // Dirsek Eğrilik Merkezi: (0, 0).
+        // Giriş Başlangıç Açısı: 270° (Radyan: 1.5 * PI). Nokta: (0, -R).
+        // Bu noktada teğet vektör: (1, 0) -> Sağa doğru.
+        // Dönüş Yönü: Saat yönünde (Açı artacak) veya tersi?
+        // Görsel olarak yukarı kıvrılsın istiyoruz.
+        // 270'den geriye doğru (270 -> 180) gidersek sola döner.
+        // 270'den ileri (270 -> 360) gidersek sağa yukarı döner. Evet!
+        
+        const startRad = 1.5 * Math.PI; // 270 derece
+        const endRad = startRad + toRad(AngleDeg); // Örn: 90 derece ise 360(0) olur.
+
+        const rOuter = R + DN/2;
+        const rInner = R - DN/2;
+
+        let ptsCenter = [], ptsOuter = [], ptsInner = [];
+        
+        // Dirsek Noktaları
+        for(let i=0; i<=Segments; i++) {
+            let t = i/Segments;
+            let a = startRad + t * (endRad - startRad);
+            ptsCenter.push({x: Math.cos(a)*R, y: Math.sin(a)*R, ang: a});
+            ptsOuter.push({x: Math.cos(a)*rOuter, y: Math.sin(a)*rOuter});
+            ptsInner.push({x: Math.cos(a)*rInner, y: Math.sin(a)*rInner});
+        }
+
+        // Giriş Uzantısı (L1)
+        // Giriş Dirsek Noktası: ptsCenter[0].
+        // Giriş Vektörü (Akış Yönü): (1, 0) değildi, teğet hesabı yapalım.
+        // Açı 270 iken cos=0, sin=-1. Teğet (1,0).
+        // L1'i GERİYE doğru ekleyeceğiz. Yani (-1, 0) yönünde L1 kadar.
+        
+        // Giriş Teğet Vektörü (Akış):
+        const t0 = startRad + Math.PI/2; 
+        const vIn = {x: Math.cos(t0), y: Math.sin(t0)}; // (1, 0)
+        
+        // Giriş Ucu (Start Point of Spool)
+        // Dirsek başından akışın tersine L1 kadar git.
+        const pInCenter = { x: ptsCenter[0].x - vIn.x * L1, y: ptsCenter[0].y - vIn.y * L1 };
+        const pInOuter = { x: ptsOuter[0].x - vIn.x * L1, y: ptsOuter[0].y - vIn.y * L1 };
+        const pInInner = { x: ptsInner[0].x - vIn.x * L1, y: ptsInner[0].y - vIn.y * L1 };
+
+        // Çıkış Uzantısı (L2)
+        // Çıkış Teğet Vektörü:
+        const tEnd = endRad + Math.PI/2;
+        const vOut = {x: Math.cos(tEnd), y: Math.sin(tEnd)};
+        
+        const lastIdx = Segments;
+        const pOutCenter = { x: ptsCenter[lastIdx].x + vOut.x * L2, y: ptsCenter[lastIdx].y + vOut.y * L2 };
+        
+        // Çıkışta Outer/Inner vektöre dik ötelenir
+        // Normal Vektör: (-y, x)
+        const nOut = {x: -vOut.y, y: vOut.x};
+        const pOutOuter = { x: pOutCenter.x + nOut.x*(DN/2), y: pOutCenter.y + nOut.y*(DN/2) };
+        const pOutInner = { x: pOutCenter.x - nOut.x*(DN/2), y: pOutCenter.y - nOut.y*(DN/2) };
+
+
+        // --- DİNAMİK ÖLÇEK AYARLARI ---
+        // Tüm noktaları kapsayan kutuyu bul
+        let allX = [pInCenter.x, pOutCenter.x, 0];
+        let allY = [pInCenter.y, pOutCenter.y, 0];
+        ptsOuter.forEach(p => { allX.push(p.x); allY.push(p.y); });
+        
+        // Kenar boşlukları için biraz daha genişlet
+        const padding = Math.max(L1, L2, R) * 0.2 + DN;
+        const minX = Math.min(...allX) - padding;
+        const maxX = Math.max(...allX) + padding;
+        const minY = Math.min(...allY) - padding;
+        const maxY = Math.max(...allY) + padding;
+        
+        const width = maxX - minX;
+        const height = maxY - minY;
+        
+        // Yazı boyutlarını çizim büyüklüğüne göre ayarla
+        const fontSize = Math.max(DN * 0.08, width * 0.015);
+        const strokeW = fontSize * 0.08;
+
+        // ViewBox Ayarla
+        svg.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+
+        // --- TANIMLAR (Defs) ---
+        const defs = createSVG('defs', {});
+        defs.innerHTML = `
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L7,3 z" fill="#000" />
+            </marker>
+             <pattern id="hatch" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                <line x1="0" y1="0" x2="0" y2="10" style="stroke:#ccc; stroke-width:1" />
+            </pattern>
+        `;
+        svg.appendChild(defs);
+
+
+        // --- ÇİZİM ---
+
+        // 1. Ana Spool Gövdesi (Path)
+        let pathD = `M ${pInOuter.x} ${pInOuter.y}`; // Giriş Üst
+        pathD += ` L ${ptsOuter[0].x} ${ptsOuter[0].y}`; // Dirsek Başı
+        for(let i=1; i<=Segments; i++) pathD += ` L ${ptsOuter[i].x} ${ptsOuter[i].y}`; // Dış Yay
+        pathD += ` L ${pOutOuter.x} ${pOutOuter.y}`; // Çıkış Üst
+        pathD += ` L ${pOutInner.x} ${pOutInner.y}`; // Çıkış Alt (Kapat)
+        pathD += ` L ${ptsInner[Segments].x} ${ptsInner[Segments].y}`; // Dirsek Sonu Alt
+        for(let i=Segments-1; i>=0; i--) pathD += ` L ${ptsInner[i].x} ${ptsInner[i].y}`; // İç Yay (Geri)
+        pathD += ` L ${pInInner.x} ${pInInner.y}`; // Giriş Alt
+        pathD += " Z";
+
+        svg.appendChild(createSVG('path', {
+            d: pathD,
+            fill: "url(#hatch)", // Tarama deseni
+            stroke: "black",
+            "stroke-width": strokeW * 2
+        }));
+
+        // 2. Eksen Çizgisi
+        let centerD = `M ${pInCenter.x} ${pInCenter.y} L ${ptsCenter[0].x} ${ptsCenter[0].y}`;
+        for(let i=1; i<=Segments; i++) centerD += ` L ${ptsCenter[i].x} ${ptsCenter[i].y}`;
+        centerD += ` L ${pOutCenter.x} ${pOutCenter.y}`;
+        
+        svg.appendChild(createSVG('path', {
+            d: centerD, fill: "none", stroke: "red", "stroke-dasharray": `${fontSize},${fontSize/2}`, "stroke-width": strokeW
+        }));
+
+        // 3. Segment Çizgileri
+        for(let i=0; i<=Segments; i++) {
+            // Sadece dirsek üzerindeki kaynak yerleri
+            svg.appendChild(createSVG('line', {
+                x1: ptsOuter[i].x, y1: ptsOuter[i].y,
+                x2: ptsInner[i].x, y2: ptsInner[i].y,
+                stroke: "#444", "stroke-width": strokeW/2
+            }));
+        }
+
+        // 4. Bağlantı Elemanları (Flanş/Manşon)
+        function drawFitting(x, y, angRad, type, isStart) {
+            if(type === 'plain') return;
+            
+            const g = createSVG('g', {transform: `translate(${x},${y}) rotate(${toDeg(angRad)})`});
+            const fH = DN * 1.4;
+            const fW = Math.max(DN*0.15, fontSize/2);
+
+            // Çizim yönü: Boru dışına doğru çizilmeli.
+            // isStart (Giriş) ise boru sağa (0 derece) gidiyor. Flanş sola (-x) olmalı.
+            // isEnd (Çıkış) ise boru bitti. Flanş ileri (+x) olmalı.
+            // Ancak fonksiyona gelen angRad, boru eksen açısı.
+            // Girişte boru akışı 0 derece. Flanşın "arkası" boruya bakmalı.
+            
+            let xOffset = 0;
+            if(isStart) xOffset = -fW; // Geriye çiz
+            
+            if(type === 'flange') {
+                g.appendChild(createSVG('rect', {
+                    x: xOffset, y: -fH/2, width: fW, height: fH,
+                    fill: "#ddd", stroke: "black", "stroke-width": strokeW
+                }));
+            } else if(type === 'coupling') {
+                const cH = DN * 1.15;
+                const cW = DN * 0.6;
+                // Manşon ortalanır
+                g.appendChild(createSVG('rect', {
+                    x: -cW/2, y: -cH/2, width: cW, height: cH,
+                    fill: "#4cc9f0", "fill-opacity": "0.7", stroke: "black", "stroke-width": strokeW
+                }));
+            }
+            svg.appendChild(g);
+        }
+
+        // Giriş: Açı t0 (Akış Yönü). isStart=true (Geriye çiz)
+        drawFitting(pInCenter.x, pInCenter.y, t0, TypeIn, true);
+        
+        // Çıkış: Açı tEnd (Akış Yönü). isStart=false (İleriye çiz)
+        drawFitting(pOutCenter.x, pOutCenter.y, tEnd, TypeOut, false);
+
+
+        // 5. Ölçülendirme Fonksiyonu
+        function drawDim(x1, y1, x2, y2, text, offsetMult=1, isAngle=false) {
+            const dx = x2-x1; 
+            const dy = y2-y1;
+            const len = Math.sqrt(dx*dx+dy*dy);
+            if(len < 1) return;
+
+            let nx = -dy/len; let ny = dx/len; // Normal
+            const offset = DN * 0.8 * offsetMult;
+            
+            const ox1 = x1 + nx*offset; const oy1 = y1 + ny*offset;
+            const ox2 = x2 + nx*offset; const oy2 = y2 + ny*offset;
+
+            const g = createSVG('g', {});
+            // Bağlantı
+            g.appendChild(createSVG('line', {x1:x1, y1:y1, x2:ox1, y2:oy1, stroke:"#555", "stroke-width": strokeW/2}));
+            g.appendChild(createSVG('line', {x1:x2, y1:y2, x2:ox2, y2:oy2, stroke:"#555", "stroke-width": strokeW/2}));
+            // Ok
+            g.appendChild(createSVG('line', {
+                x1:ox1, y1:oy1, x2:ox2, y2:oy2, stroke:"black", "stroke-width": strokeW/1.5,
+                "marker-start":"url(#arrow)", "marker-end":"url(#arrow)"
+            }));
+
+            // Yazı
+            const mx = (ox1+ox2)/2; const my = (oy1+oy2)/2;
+            // Açıyı düzelt (Yazı okunabilir olsun)
+            let txtAng = toDeg(Math.atan2(dy, dx));
+            if(txtAng > 90 || txtAng < -90) txtAng += 180;
+
+            const t = createSVG('text', {
+                x: mx, y: my, "text-anchor":"middle", "dy": -fontSize*0.3,
+                "font-size": fontSize, "font-family": "monospace",
+                transform: `rotate(${txtAng}, ${mx}, ${my})`
+            });
+            t.textContent = text;
+            g.appendChild(t);
+            svg.appendChild(g);
+        }
+
+        // L1
+        if(L1>0) drawDim(pInCenter.x, pInCenter.y, ptsCenter[0].x, ptsCenter[0].y, `L1=${L1}`, 1.2);
+        
+        // L2
+        if(L2>0) drawDim(ptsCenter[Segments].x, ptsCenter[Segments].y, pOutCenter.x, pOutCenter.y, `L2=${L2}`, -1.2);
+
+        // Segment Uzunluğu (S) Gösterimi (İlk Segment Üzerinde)
+        // Segment Kiriş Uzunluğu
+        const chordLen = 2 * R * Math.sin((toRad(AngleDeg)/Segments)/2);
+        // Yayın dışından göster
+        const pS1 = ptsOuter[0];
+        const pS2 = ptsOuter[1];
+        // Basitçe orta noktaya yazı koy
+        const sMx = (pS1.x + pS2.x)/2;
+        const sMy = (pS1.y + pS2.y)/2;
+        // Biraz dışarı it
+        const sVecX = sMx - 0; const sVecY = sMy - 0; // Merkezden dışa
+        const sDist = Math.sqrt(sVecX*sVecX + sVecY*sVecY);
+        const sFinX = (sVecX/sDist) * (rOuter + DN*0.4);
+        const sFinY = (sVecY/sDist) * (rOuter + DN*0.4);
+        
+        const txtS = createSVG('text', {
+            x: sFinX, y: sFinY, "text-anchor":"middle", "font-size": fontSize*0.8, fill:"red"
+        });
+        txtS.textContent = `S ≈ ${chordLen.toFixed(1)}`;
+        svg.appendChild(txtS);
+
+        // Açı Gösterimi
+        // Merkezden yayı tara
+        const arcPath = `M ${Math.cos(startRad)*R*0.5} ${Math.sin(startRad)*R*0.5} A ${R*0.5} ${R*0.5} 0 0 1 ${Math.cos(endRad)*R*0.5} ${Math.sin(endRad)*R*0.5}`;
+        svg.appendChild(createSVG('path', {d: arcPath, fill:"none", stroke:"blue", "marker-end":"url(#arrow)"}));
+        svg.appendChild(createSVG('text', {
+            x: 0, y: R*0.3, "text-anchor":"middle", "font-size": fontSize*1.2, fill:"blue", "font-weight":"bold"
+        })).textContent = `${AngleDeg}°`;
+
+
+        // --- LEJANT (ANTET) ---
+        // Çizimin sağ alt köşesine (Viewbox içinde)
+        const legW = width * 0.35;
+        const legH = fontSize * 8;
+        const legX = maxX - legW;
+        const legY = maxY - legH;
+
+        const legG = createSVG('g', {});
+        legG.appendChild(createSVG('rect', {
+            x: legX, y: legY, width: legW, height: legH, 
+            fill: "white", stroke: "black", "stroke-width": strokeW
+        }));
+        
+        const rowH = legH / 4;
+        const addTxt = (txt, r, c="black", w="normal", align="start", offX=fontSize) => {
+            const el = createSVG('text', {
+                x: align=="middle" ? legX + legW/2 : legX + offX, 
+                y: legY + r*rowH + rowH*0.6,
+                "font-size": fontSize*0.7, "font-family": "sans-serif", "fill":c, "font-weight":w, "text-anchor":align
+            });
+            el.textContent = txt;
+            legG.appendChild(el);
+        };
+
+        // Çizgiler
+        [1,2,3].forEach(i => {
+            legG.appendChild(createSVG('line', {x1:legX, y1:legY+i*rowH, x2:legX+legW, y2:legY+i*rowH, stroke:"black", "stroke-width":strokeW/2}));
+        });
+        // Dikey Çizgi
+        legG.appendChild(createSVG('line', {x1:legX+legW*0.6, y1:legY+rowH, x2:legX+legW*0.6, y2:legY+legH, stroke:"black", "stroke-width":strokeW/2}));
+
+        const date = new Date().toLocaleDateString('tr-TR');
+        addTxt("GRP SPOOL İMALAT RESMİ", 0, "black", "bold", "middle");
+        addTxt(`DN: ${DN} mm`, 1);
+        addTxt(`TARİH: ${date}`, 1, "black", "normal", "start", legW*0.62);
+        addTxt(`AÇI: ${AngleDeg}° / R=${RFactor}`, 2);
+        addTxt(`REV: 0`, 2, "black", "normal", "start", legW*0.62);
+        addTxt(`L1: ${L1} / L2: ${L2}`, 3);
+        addTxt(`SEG: ${Segments}`, 3, "red", "bold", "start", legW*0.62);
+
+        svg.appendChild(legG);
+
+
+        // --- HTML RAPOR ---
+        // Segment Yayı (Dış) ve Orta
+        const arcLen = (toRad(AngleDeg) * R);
+        const segmentArcLen = arcLen / Segments;
+        
+        document.getElementById('report').innerHTML = `
+            <div class="tech-row"><span>Toplam Eksen:</span> <span>${(L1 + L2 + arcLen).toFixed(1)} mm</span></div>
+            <div class="tech-row"><span>Dirsek Yay Boyu:</span> <span>${arcLen.toFixed(1)} mm</span></div>
+            <div class="tech-row"><span>Segment Sayısı:</span> <span>${Segments}</span></div>
+            <div class="tech-row"><span>Segment Yay Boyu:</span> <span>${segmentArcLen.toFixed(1)} mm</span></div>
+            <div class="tech-row"><span>Segment Kiriş (S):</span> <span>${chordLen.toFixed(1)} mm</span></div>
+        `;
+    }
+
+    // Başlangıç
+    window.onload = draw;
+</script>
+
+</body>
+</html>
